@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S/MIME Zertifikate – CryptoStudio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#090d16',
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Crypto Library: node-forge -->
+    <script src="https://cdn.jsdelivr.net/npm/node-forge@1.3.1/dist/forge.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 sm:left-auto sm:right-5 sm:translate-x-0 z-50 transform -translate-y-24 opacity-0 transition-all duration-300 pointer-events-none w-[90%] sm:w-auto">
+        <div class="bg-emerald-600/95 backdrop-blur-md text-white font-medium px-4 py-3 rounded-xl shadow-2xl flex items-center justify-center space-x-2 border border-emerald-400/40 text-sm">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <span id="toastMsg">In die Zwischenablage kopiert!</span>
+        </div>
+    </div>
+
+    <!-- Header / Navigation -->
+    <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <a href="index.html" class="flex items-center space-x-3 group">
+                <img src="assets/logo.jpeg" alt="CryptoStudio" class="h-9 w-auto rounded-lg border border-slate-800">
+                <div>
+                    <span class="font-bold text-lg text-white tracking-tight group-hover:text-emerald-400 transition">CryptoStudio</span>
+                    <span class="block text-[11px] text-slate-400">Minimalist Cryptography Suite</span>
+                </div>
+            </a>
+            <nav class="flex items-center space-x-4 text-xs font-medium text-slate-300">
+                <a href="index.html" class="hover:text-emerald-400 transition">Dashboard</a>
+                <a href="smime.html" class="text-emerald-400 font-semibold border-b-2 border-emerald-400 pb-1">S/MIME</a>
+                <a href="ssh.html" class="hover:text-emerald-400 transition">SSH</a>
+                <a href="pgp.html" class="hover:text-emerald-400 transition">PGP</a>
+                <a href="secrets.html" class="hover:text-emerald-400 transition">Secrets</a>
+                <a href="hashes.html" class="hover:text-emerald-400 transition">Hashes</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 flex-grow">
+        <!-- Page Title & Privacy Note -->
+        <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
+            <div>
+                <span class="text-xs font-mono text-emerald-400 uppercase tracking-widest">S/MIME Module</span>
+                <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">S/MIME Zertifikatspaket</h1>
+                <p class="text-slate-400 text-xs sm:text-sm mt-1">
+                    Erstelle lokal ein vollwertiges E-Mail-Verschlüsselungs- und Signatur-Zertifikat (.p12, .crt, .key).
+                </p>
+            </div>
+            <div class="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full text-xs text-emerald-400 self-start md:self-auto">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>100% Lokale Berechnung</span>
+            </div>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-md">
+            <form id="smimeForm" onsubmit="generateSmimeCertificates(event)" class="space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Vollständiger Name (Common Name)</label>
+                        <input type="text" id="smimeCommonName" value="Max Mustermann" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">E-Mail Adresse</label>
+                        <input type="email" id="smimeEmail" value="max@beispiel.de" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Organisation / Firma</label>
+                        <input type="text" id="smimeOrg" value="Mein Unternehmen" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Ländercode (z.B. DE, AT, CH)</label>
+                        <input type="text" id="smimeCountry" value="DE" maxlength="2" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Gültigkeit in Tagen</label>
+                        <input type="number" id="smimeDays" value="730" min="30" max="3650" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Schlüssellänge</label>
+                        <select id="smimeKeyBits" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                            <option value="2048" selected>RSA 2048 Bit (Standard & Schnell)</option>
+                            <option value="4096">RSA 4096 Bit (Hohe Sicherheit)</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">.p12 Export-Passwort</label>
+                        <input type="password" id="smimePassword" value="geheim123" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                        <p class="text-xs text-slate-500 mt-1">Benötigt beim Import in Outlook, Thunderbird oder Apple Mail.</p>
+                    </div>
+                </div>
+
+                <!-- Mandatory ToS Checkbox -->
+                <div class="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-start space-x-3">
+                    <input type="checkbox" id="smimeTos" onchange="toggleSmimeSubmitBtn()" class="mt-0.5 rounded accent-emerald-500 w-4 h-4 cursor-pointer">
+                    <label for="smimeTos" class="text-xs text-slate-300 cursor-pointer leading-relaxed">
+                        Ich habe die <a href="terms.html" target="_blank" class="text-emerald-400 hover:underline font-medium">Nutzungsbedingungen</a> gelesen und akzeptiere diese. Ich verstehe, dass meine Schlüssel ausschließlich lokal erzeugt werden.
+                    </label>
+                </div>
+
+                <button type="submit" id="btnSmimeGenerate" disabled class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-xl transition duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    <span>S/MIME Zertifikate lokal generieren</span>
+                </button>
+            </form>
+
+            <!-- Status Spinner -->
+            <div id="smimeStatus" class="hidden mt-8 text-center">
+                <div class="inline-flex items-center space-x-3 bg-slate-950 border border-slate-800 px-6 py-4 rounded-xl shadow-lg">
+                    <svg class="animate-spin h-5 w-5 text-emerald-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-xs sm:text-sm font-medium text-slate-300">Generiere RSA-Schlüsselpaar und S/MIME Zertifikate...</span>
+                </div>
+            </div>
+
+            <!-- Outputs -->
+            <div id="smimeOutput" class="hidden mt-10 border-t border-slate-800 pt-8 space-y-6">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>Generierte Zertifikate & Schlüssel</span>
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Step 1: Root CA -->
+                    <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                        <div>
+                            <span class="text-[11px] font-mono text-emerald-400 uppercase tracking-wider">Schritt 1</span>
+                            <h4 class="font-bold text-white text-sm sm:text-base mt-0.5">Root-CA Zertifikat (ca.crt)</h4>
+                            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+                                In dein Betriebssystem/Mailprogramm als vertrauenswürdige CA importieren.
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="downloadTextFile('ca.crt', generatedSmime.caPem)" class="flex-1 bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-emerald-400 border border-emerald-500/30 py-2.5 rounded-xl transition flex items-center justify-center">
+                                ca.crt Herunterladen
+                            </button>
+                            <button onclick="copyToClipboard(generatedSmime.caPem)" class="px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 text-xs font-medium">
+                                Kopieren
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: S/MIME PKCS#12 Bundle -->
+                    <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                        <div>
+                            <span class="text-[11px] font-mono text-emerald-400 uppercase tracking-wider">Schritt 2</span>
+                            <h4 class="font-bold text-white text-sm sm:text-base mt-0.5">S/MIME Bundle (smime.p12)</h4>
+                            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+                                Enthält privater Schlüssel & Zertifikat. Direkt in Outlook, Thunderbird oder Apple Mail importieren.
+                            </p>
+                        </div>
+                        <button onclick="downloadBinaryFile('smime.p12', generatedSmime.p12Bytes, 'application/x-pkcs12')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white py-2.5 rounded-xl transition flex items-center justify-center">
+                            smime.p12 Herunterladen
+                        </button>
+                    </div>
+
+                    <!-- Step 3: User Cert PEM -->
+                    <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                        <div>
+                            <span class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Zusatz</span>
+                            <h4 class="font-bold text-white text-sm sm:text-base mt-0.5">S/MIME Zertifikat PEM (smime.crt)</h4>
+                            <p class="text-xs text-slate-400 mt-1">Öffentliches Nutzerzertifikat im PEM-Format.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="downloadTextFile('smime.crt', generatedSmime.userPem)" class="flex-1 bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-slate-300 border border-slate-800 py-2.5 rounded-xl transition flex items-center justify-center">
+                                smime.crt Herunterladen
+                            </button>
+                            <button onclick="copyToClipboard(generatedSmime.userPem)" class="px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 text-xs">
+                                Kopieren
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: User Private Key PEM -->
+                    <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                        <div>
+                            <span class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Zusatz</span>
+                            <h4 class="font-bold text-white text-sm sm:text-base mt-0.5">Privater Schlüssel PEM (smime.key)</h4>
+                            <p class="text-xs text-slate-400 mt-1">Privater RSA-Schlüssel im PEM-Format.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="downloadTextFile('smime.key', generatedSmime.userKeyPem)" class="flex-1 bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-slate-300 border border-slate-800 py-2.5 rounded-xl transition flex items-center justify-center">
+                                smime.key Herunterladen
+                            </button>
+                            <button onclick="copyToClipboard(generatedSmime.userKeyPem)" class="px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 text-xs">
+                                Kopieren
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-900/40 py-6 text-center mt-auto">
+        <p class="text-xs text-slate-400">
+            © CryptoStudio – Minimalist & Secure Local Crypto Tools.
+            <a href="terms.html" class="text-slate-300 hover:text-emerald-400 ml-2 transition underline">Nutzungsbedingungen</a>
+        </p>
+    </footer>
+
+    <!-- Logic Script -->
+    <script>
+        let generatedSmime = { caPem: '', userPem: '', userKeyPem: '', p12Bytes: null };
+
+        function toggleSmimeSubmitBtn() {
+            const tosChecked = document.getElementById('smimeTos').checked;
+            document.getElementById('btnSmimeGenerate').disabled = !tosChecked;
+        }
+
+        function copyToClipboard(text) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("In die Zwischenablage kopiert!");
+            }).catch(err => {
+                showToast("Kopieren fehlgeschlagen: " + err);
+            });
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('-translate-y-24', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-24', 'opacity-0');
+            }, 2500);
+        }
+
+        function downloadTextFile(filename, content) {
+            const element = document.createElement('a');
+            element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        function downloadBinaryFile(filename, bytes, mimeType) {
+            const blob = new Blob([bytes], { type: mimeType });
+            const element = document.createElement('a');
+            element.href = URL.createObjectURL(blob);
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        async function generateSmimeCertificates(event) {
+            event.preventDefault();
+            if (!document.getElementById('smimeTos').checked) {
+                alert("Bitte akzeptiere die Nutzungsbedingungen.");
+                return;
+            }
+
+            document.getElementById('smimeStatus').classList.remove('hidden');
+            document.getElementById('smimeOutput').classList.add('hidden');
+
+            setTimeout(() => {
+                try {
+                    const cn = document.getElementById('smimeCommonName').value;
+                    const email = document.getElementById('smimeEmail').value;
+                    const org = document.getElementById('smimeOrg').value;
+                    const country = document.getElementById('smimeCountry').value;
+                    const days = parseInt(document.getElementById('smimeDays').value);
+                    const keyBits = parseInt(document.getElementById('smimeKeyBits').value);
+                    const password = document.getElementById('smimePassword').value;
+
+                    // Root CA Keypair & Cert
+                    const caKeys = forge.pki.rsa.generateKeyPair(keyBits);
+                    const caCert = forge.pki.createCertificate();
+                    caCert.publicKey = caKeys.publicKey;
+                    caCert.serialNumber = '01' + Math.floor(Math.random() * 100000);
+                    caCert.validity.notBefore = new Date();
+                    caCert.validity.notAfter = new Date();
+                    caCert.validity.notAfter.setFullYear(caCert.validity.notBefore.getFullYear() + 10);
+
+                    const caAttrs = [
+                        { name: 'countryName', value: country },
+                        { name: 'organizationName', value: org + ' Local CA' },
+                        { name: 'commonName', value: org + ' Root CA' }
+                    ];
+                    caCert.setSubject(caAttrs);
+                    caCert.setIssuer(caAttrs);
+                    caCert.setExtensions([
+                        { name: 'basicConstraints', cA: true, critical: true },
+                        { name: 'keyUsage', keyCertSign: true, cRLSign: true, critical: true }
+                    ]);
+                    caCert.sign(caKeys.privateKey, forge.md.sha256.create());
+
+                    // User Keypair & Cert
+                    const userKeys = forge.pki.rsa.generateKeyPair(keyBits);
+                    const userCert = forge.pki.createCertificate();
+                    userCert.publicKey = userKeys.publicKey;
+                    userCert.serialNumber = '02' + Math.floor(Math.random() * 100000);
+                    userCert.validity.notBefore = new Date();
+                    userCert.validity.notAfter = new Date();
+                    userCert.validity.notAfter.setDate(userCert.validity.notBefore.getDate() + days);
+
+                    const userAttrs = [
+                        { name: 'countryName', value: country },
+                        { name: 'organizationName', value: org },
+                        { name: 'commonName', value: cn },
+                        { name: 'emailAddress', value: email }
+                    ];
+                    userCert.setSubject(userAttrs);
+                    userCert.setIssuer(caAttrs);
+                    userCert.setExtensions([
+                        { name: 'basicConstraints', cA: false },
+                        { name: 'keyUsage', digitalSignature: true, nonRepudiation: true, keyEncipherment: true, dataEncipherment: true },
+                        { name: 'extKeyUsage', emailProtection: true },
+                        { name: 'subjectAltName', altNames: [{ type: 1, value: email }] }
+                    ]);
+                    userCert.sign(caKeys.privateKey, forge.md.sha256.create());
+
+                    generatedSmime.caPem = forge.pki.certificateToPem(caCert);
+                    generatedSmime.userPem = forge.pki.certificateToPem(userCert);
+                    generatedSmime.userKeyPem = forge.pki.privateKeyToPem(userKeys.privateKey);
+
+                    const p12Asn1 = forge.pkcs12.toPkcs12Asn1(userKeys.privateKey, [userCert, caCert], password, { generateLocalKeyId: true, friendlyName: 'S/MIME Certificate' });
+                    const p12Der = forge.asn1.toDer(p12Asn1).getBytes();
+
+                    const p12Bytes = new Uint8Array(p12Der.length);
+                    for (let i = 0; i < p12Der.length; i++) {
+                        p12Bytes[i] = p12Der.charCodeAt(i);
+                    }
+                    generatedSmime.p12Bytes = p12Bytes;
+
+                    document.getElementById('smimeStatus').classList.add('hidden');
+                    document.getElementById('smimeOutput').classList.remove('hidden');
+                } catch (err) {
+                    alert("Fehler bei S/MIME Generierung: " + err.message);
+                    document.getElementById('smimeStatus').classList.add('hidden');
+                }
+            }, 100);
+        }
+    </script>
+</body>
+</html>

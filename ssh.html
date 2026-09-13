@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSH Key Pair – CryptoStudio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#090d16',
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Crypto Library: node-forge -->
+    <script src="https://cdn.jsdelivr.net/npm/node-forge@1.3.1/dist/forge.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 sm:left-auto sm:right-5 sm:translate-x-0 z-50 transform -translate-y-24 opacity-0 transition-all duration-300 pointer-events-none w-[90%] sm:w-auto">
+        <div class="bg-emerald-600/95 backdrop-blur-md text-white font-medium px-4 py-3 rounded-xl shadow-2xl flex items-center justify-center space-x-2 border border-emerald-400/40 text-sm">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <span id="toastMsg">In die Zwischenablage kopiert!</span>
+        </div>
+    </div>
+
+    <!-- Header / Navigation -->
+    <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <a href="index.html" class="flex items-center space-x-3 group">
+                <img src="assets/logo.jpeg" alt="CryptoStudio" class="h-9 w-auto rounded-lg border border-slate-800">
+                <div>
+                    <span class="font-bold text-lg text-white tracking-tight group-hover:text-emerald-400 transition">CryptoStudio</span>
+                    <span class="block text-[11px] text-slate-400">Minimalist Cryptography Suite</span>
+                </div>
+            </a>
+            <nav class="flex items-center space-x-4 text-xs font-medium text-slate-300">
+                <a href="index.html" class="hover:text-emerald-400 transition">Dashboard</a>
+                <a href="smime.html" class="hover:text-emerald-400 transition">S/MIME</a>
+                <a href="ssh.html" class="text-emerald-400 font-semibold border-b-2 border-emerald-400 pb-1">SSH</a>
+                <a href="pgp.html" class="hover:text-emerald-400 transition">PGP</a>
+                <a href="secrets.html" class="hover:text-emerald-400 transition">Secrets</a>
+                <a href="hashes.html" class="hover:text-emerald-400 transition">Hashes</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 flex-grow">
+        <!-- Page Title & Privacy Note -->
+        <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
+            <div>
+                <span class="text-xs font-mono text-emerald-400 uppercase tracking-widest">SSH Module</span>
+                <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">SSH Schlüsselpaar Generierung</h1>
+                <p class="text-slate-400 text-xs sm:text-sm mt-1">
+                    Erzeuge OpenSSH-kompatible Schlüssel (id_rsa & id_rsa.pub) lokal für Serverzugriffe.
+                </p>
+            </div>
+            <div class="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full text-xs text-emerald-400 self-start md:self-auto">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>100% Lokale Berechnung</span>
+            </div>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-md">
+            <form id="sshForm" onsubmit="generateSshKeyPair(event)" class="space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Schlüsseltyp & Länge</label>
+                        <select id="sshKeyType" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                            <option value="rsa2048">RSA 2048 Bit</option>
+                            <option value="rsa4096" selected>RSA 4096 Bit (Empfohlen)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Kommentar / E-Mail</label>
+                        <input type="text" id="sshComment" value="user@server.local" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <!-- Mandatory ToS Checkbox -->
+                <div class="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-start space-x-3">
+                    <input type="checkbox" id="sshTos" onchange="toggleSshSubmitBtn()" class="mt-0.5 rounded accent-emerald-500 w-4 h-4 cursor-pointer">
+                    <label for="sshTos" class="text-xs text-slate-300 cursor-pointer leading-relaxed">
+                        Ich habe die <a href="terms.html" target="_blank" class="text-emerald-400 hover:underline font-medium">Nutzungsbedingungen</a> gelesen und akzeptiere diese. Ich verstehe, dass meine Schlüssel ausschließlich lokal erzeugt werden.
+                    </label>
+                </div>
+
+                <button type="submit" id="btnSshGenerate" disabled class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-xl transition duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base">
+                    <span>SSH Schlüsselpaar lokal generieren</span>
+                </button>
+            </form>
+
+            <!-- Status Spinner -->
+            <div id="sshStatus" class="hidden mt-8 text-center">
+                <div class="inline-flex items-center space-x-3 bg-slate-950 border border-slate-800 px-6 py-4 rounded-xl shadow-lg">
+                    <svg class="animate-spin h-5 w-5 text-emerald-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span class="text-xs sm:text-sm font-medium text-slate-300">Generiere SSH-Schlüsselpaar...</span>
+                </div>
+            </div>
+
+            <!-- Output Area -->
+            <div id="sshOutput" class="hidden mt-10 border-t border-slate-800 pt-8 space-y-6">
+                <div class="space-y-5">
+                    <div>
+                        <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                            <label class="text-xs sm:text-sm font-bold text-white">Öffentlicher SSH Schlüssel (id_rsa.pub)</label>
+                            <div class="space-x-2">
+                                <button onclick="copyToClipboard(generatedSsh.publicKey)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-lg transition">Kopieren</button>
+                                <button onclick="downloadTextFile('id_rsa.pub', generatedSsh.publicKey)" class="px-3 py-1 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs font-medium rounded-lg transition">Herunterladen</button>
+                            </div>
+                        </div>
+                        <textarea id="sshPubKeyArea" readonly class="w-full h-24 bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs font-mono text-emerald-400 focus:outline-none resize-none break-all"></textarea>
+                    </div>
+
+                    <div>
+                        <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                            <label class="text-xs sm:text-sm font-bold text-white">Privater SSH Schlüssel (id_rsa)</label>
+                            <div class="space-x-2">
+                                <button onclick="copyToClipboard(generatedSsh.privateKey)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-lg transition">Kopieren</button>
+                                <button onclick="downloadTextFile('id_rsa', generatedSsh.privateKey)" class="px-3 py-1 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs font-medium rounded-lg transition">Herunterladen</button>
+                            </div>
+                        </div>
+                        <textarea id="sshPrvKeyArea" readonly class="w-full h-40 bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs font-mono text-slate-300 focus:outline-none resize-none break-all"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-900/40 py-6 text-center mt-auto">
+        <p class="text-xs text-slate-400">
+            © CryptoStudio – Minimalist & Secure Local Crypto Tools.
+            <a href="terms.html" class="text-slate-300 hover:text-emerald-400 ml-2 transition underline">Nutzungsbedingungen</a>
+        </p>
+    </footer>
+
+    <!-- Logic Script -->
+    <script>
+        let generatedSsh = { publicKey: '', privateKey: '' };
+
+        function toggleSshSubmitBtn() {
+            const tosChecked = document.getElementById('sshTos').checked;
+            document.getElementById('btnSshGenerate').disabled = !tosChecked;
+        }
+
+        function copyToClipboard(text) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("In die Zwischenablage kopiert!");
+            }).catch(err => {
+                showToast("Kopieren fehlgeschlagen: " + err);
+            });
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('-translate-y-24', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-24', 'opacity-0');
+            }, 2500);
+        }
+
+        function downloadTextFile(filename, content) {
+            const element = document.createElement('a');
+            element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        async function generateSshKeyPair(event) {
+            event.preventDefault();
+            if (!document.getElementById('sshTos').checked) {
+                alert("Bitte akzeptiere die Nutzungsbedingungen.");
+                return;
+            }
+
+            document.getElementById('sshStatus').classList.remove('hidden');
+            document.getElementById('sshOutput').classList.add('hidden');
+
+            setTimeout(async () => {
+                try {
+                    const keyType = document.getElementById('sshKeyType').value;
+                    const comment = document.getElementById('sshComment').value;
+                    const bits = keyType === 'rsa4096' ? 4096 : 2048;
+
+                    const keyPair = await window.crypto.subtle.generateKey(
+                        {
+                            name: "RSASSA-PKCS1-v1_5",
+                            modulusLength: bits,
+                            publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
+                            hash: "SHA-256",
+                        },
+                        true,
+                        ["sign", "verify"]
+                    );
+
+                    const prvBuffer = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+                    const pubBuffer = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
+
+                    const prvAsn1 = forge.asn1.fromDer(forge.util.createBuffer(new Uint8Array(prvBuffer)));
+                    const prvKey = forge.pki.privateKeyFromAsn1(prvAsn1);
+
+                    const pubAsn1 = forge.asn1.fromDer(forge.util.createBuffer(new Uint8Array(pubBuffer)));
+                    const pubKey = forge.pki.publicKeyFromAsn1(pubAsn1);
+
+                    generatedSsh.publicKey = forge.ssh.publicKeyToOpenSSH(pubKey, comment);
+                    generatedSsh.privateKey = forge.pki.privateKeyToPem(prvKey);
+
+                    document.getElementById('sshPubKeyArea').value = generatedSsh.publicKey;
+                    document.getElementById('sshPrvKeyArea').value = generatedSsh.privateKey;
+
+                    document.getElementById('sshStatus').classList.add('hidden');
+                    document.getElementById('sshOutput').classList.remove('hidden');
+                } catch (err) {
+                    alert("Fehler bei SSH-Generierung: " + err.message);
+                    document.getElementById('sshStatus').classList.add('hidden');
+                }
+            }, 50);
+        }
+    </script>
+</body>
+</html>
