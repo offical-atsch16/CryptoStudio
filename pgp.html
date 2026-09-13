@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenPGP Key Pair – CryptoStudio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#090d16',
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Crypto Library: openpgp -->
+    <script src="https://cdn.jsdelivr.net/npm/openpgp@5.11.0/dist/openpgp.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-slate-950">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 sm:left-auto sm:right-5 sm:translate-x-0 z-50 transform -translate-y-24 opacity-0 transition-all duration-300 pointer-events-none w-[90%] sm:w-auto">
+        <div class="bg-emerald-600/95 backdrop-blur-md text-white font-medium px-4 py-3 rounded-xl shadow-2xl flex items-center justify-center space-x-2 border border-emerald-400/40 text-sm">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <span id="toastMsg">In die Zwischenablage kopiert!</span>
+        </div>
+    </div>
+
+    <!-- Header / Navigation -->
+    <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <a href="index.html" class="flex items-center space-x-3 group">
+                <img src="assets/logo.jpeg" alt="CryptoStudio" class="h-9 w-auto rounded-lg border border-slate-800">
+                <div>
+                    <span class="font-bold text-lg text-white tracking-tight group-hover:text-emerald-400 transition">CryptoStudio</span>
+                    <span class="block text-[11px] text-slate-400">Minimalist Cryptography Suite</span>
+                </div>
+            </a>
+            <nav class="flex items-center space-x-4 text-xs font-medium text-slate-300">
+                <a href="index.html" class="hover:text-emerald-400 transition">Dashboard</a>
+                <a href="smime.html" class="hover:text-emerald-400 transition">S/MIME</a>
+                <a href="ssh.html" class="hover:text-emerald-400 transition">SSH</a>
+                <a href="pgp.html" class="text-emerald-400 font-semibold border-b-2 border-emerald-400 pb-1">PGP</a>
+                <a href="secrets.html" class="hover:text-emerald-400 transition">Secrets</a>
+                <a href="hashes.html" class="hover:text-emerald-400 transition">Hashes</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto w-full px-4 sm:px-6 py-8 flex-grow">
+        <!-- Page Title & Privacy Note -->
+        <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
+            <div>
+                <span class="text-xs font-mono text-emerald-400 uppercase tracking-widest">OpenPGP Module</span>
+                <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">OpenPGP / GPG Schlüsselpaar</h1>
+                <p class="text-slate-400 text-xs sm:text-sm mt-1">
+                    Erstelle PGP-Schlüsselpaare für GnuPG, Mailvelope und verschlüsselte Kommunikation.
+                </p>
+            </div>
+            <div class="inline-flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full text-xs text-emerald-400 self-start md:self-auto">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>100% Lokale Berechnung</span>
+            </div>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-md">
+            <form id="pgpForm" onsubmit="generatePgpKeyPair(event)" class="space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Name</label>
+                        <input type="text" id="pgpName" value="Max Mustermann" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">E-Mail Adresse</label>
+                        <input type="email" id="pgpEmail" value="max@beispiel.de" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Schlüsseltyp</label>
+                        <select id="pgpKeyType" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                            <option value="rsa2048">RSA 2048 Bit</option>
+                            <option value="rsa4096" selected>RSA 4096 Bit</option>
+                            <option value="ecc">ECC Curve25519 (Schnell & Modern)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Passphrase (Optional)</label>
+                        <input type="password" id="pgpPassphrase" placeholder="Optionaler Schutz" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <!-- Mandatory ToS Checkbox -->
+                <div class="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-start space-x-3">
+                    <input type="checkbox" id="pgpTos" onchange="togglePgpSubmitBtn()" class="mt-0.5 rounded accent-emerald-500 w-4 h-4 cursor-pointer">
+                    <label for="pgpTos" class="text-xs text-slate-300 cursor-pointer leading-relaxed">
+                        Ich habe die <a href="terms.html" target="_blank" class="text-emerald-400 hover:underline font-medium">Nutzungsbedingungen</a> gelesen und akzeptiere diese. Ich verstehe, dass meine Schlüssel ausschließlich lokal erzeugt werden.
+                    </label>
+                </div>
+
+                <button type="submit" id="btnPgpGenerate" disabled class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3.5 px-4 rounded-xl transition duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base">
+                    <span>OpenPGP Schlüsselpaar lokal generieren</span>
+                </button>
+            </form>
+
+            <!-- Status Spinner -->
+            <div id="pgpStatus" class="hidden mt-8 text-center">
+                <div class="inline-flex items-center space-x-3 bg-slate-950 border border-slate-800 px-6 py-4 rounded-xl shadow-lg">
+                    <svg class="animate-spin h-5 w-5 text-emerald-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span class="text-xs sm:text-sm font-medium text-slate-300">Generiere PGP-Schlüsselpaar...</span>
+                </div>
+            </div>
+
+            <!-- Output Area -->
+            <div id="pgpOutput" class="hidden mt-10 border-t border-slate-800 pt-8 space-y-6">
+                <div class="p-4 bg-slate-950 rounded-xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs gap-2">
+                    <div>
+                        <span class="text-slate-400">Fingerabdruck: </span>
+                        <span id="pgpFingerprint" class="font-mono text-emerald-400 font-bold uppercase break-all"></span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400">Key ID: </span>
+                        <span id="pgpKeyId" class="font-mono text-white font-bold uppercase"></span>
+                    </div>
+                </div>
+
+                <div class="space-y-5">
+                    <div>
+                        <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                            <label class="text-xs sm:text-sm font-bold text-white">Öffentlicher PGP Schlüssel (public.asc)</label>
+                            <div class="space-x-2">
+                                <button onclick="copyToClipboard(generatedPgp.publicKey)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-lg transition">Kopieren</button>
+                                <button onclick="downloadTextFile('public.asc', generatedPgp.publicKey)" class="px-3 py-1 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs font-medium rounded-lg transition">Herunterladen</button>
+                            </div>
+                        </div>
+                        <textarea id="pgpPubKeyArea" readonly class="w-full h-36 bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs font-mono text-emerald-400 focus:outline-none resize-none break-all"></textarea>
+                    </div>
+
+                    <div>
+                        <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                            <label class="text-xs sm:text-sm font-bold text-white">Privater PGP Schlüssel (private.asc)</label>
+                            <div class="space-x-2">
+                                <button onclick="copyToClipboard(generatedPgp.privateKey)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-lg transition">Kopieren</button>
+                                <button onclick="downloadTextFile('private.asc', generatedPgp.privateKey)" class="px-3 py-1 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs font-medium rounded-lg transition">Herunterladen</button>
+                            </div>
+                        </div>
+                        <textarea id="pgpPrvKeyArea" readonly class="w-full h-36 bg-slate-950 border border-slate-800 rounded-xl p-3.5 text-xs font-mono text-slate-300 focus:outline-none resize-none break-all"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-900/40 py-6 text-center mt-auto">
+        <p class="text-xs text-slate-400">
+            © CryptoStudio – Minimalist & Secure Local Crypto Tools.
+            <a href="terms.html" class="text-slate-300 hover:text-emerald-400 ml-2 transition underline">Nutzungsbedingungen</a>
+        </p>
+    </footer>
+
+    <!-- Logic Script -->
+    <script>
+        let generatedPgp = { publicKey: '', privateKey: '' };
+
+        function togglePgpSubmitBtn() {
+            const tosChecked = document.getElementById('pgpTos').checked;
+            document.getElementById('btnPgpGenerate').disabled = !tosChecked;
+        }
+
+        function copyToClipboard(text) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("In die Zwischenablage kopiert!");
+            }).catch(err => {
+                showToast("Kopieren fehlgeschlagen: " + err);
+            });
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('-translate-y-24', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-24', 'opacity-0');
+            }, 2500);
+        }
+
+        function downloadTextFile(filename, content) {
+            const element = document.createElement('a');
+            element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        async function generatePgpKeyPair(event) {
+            event.preventDefault();
+            if (!document.getElementById('pgpTos').checked) {
+                alert("Bitte akzeptiere die Nutzungsbedingungen.");
+                return;
+            }
+
+            document.getElementById('pgpStatus').classList.remove('hidden');
+            document.getElementById('pgpOutput').classList.add('hidden');
+
+            try {
+                const name = document.getElementById('pgpName').value;
+                const email = document.getElementById('pgpEmail').value;
+                const keyType = document.getElementById('pgpKeyType').value;
+                const passphrase = document.getElementById('pgpPassphrase').value;
+
+                let opts = {
+                    userIDs: [{ name, email }],
+                    passphrase
+                };
+
+                if (keyType === 'ecc') {
+                    opts.type = 'ecc';
+                    opts.curve = 'ed25519';
+                } else {
+                    opts.type = 'rsa';
+                    opts.rsaBits = keyType === 'rsa4096' ? 4096 : 2048;
+                }
+
+                const key = await openpgp.generateKey(opts);
+                generatedPgp.publicKey = key.publicKey;
+                generatedPgp.privateKey = key.privateKey;
+
+                const parsedKey = await openpgp.readKey({ armoredKey: key.publicKey });
+
+                document.getElementById('pgpFingerprint').innerText = parsedKey.getFingerprint();
+                document.getElementById('pgpKeyId').innerText = parsedKey.getKeyID().toHex();
+                document.getElementById('pgpPubKeyArea').value = generatedPgp.publicKey;
+                document.getElementById('pgpPrvKeyArea').value = generatedPgp.privateKey;
+
+                document.getElementById('pgpStatus').classList.add('hidden');
+                document.getElementById('pgpOutput').classList.remove('hidden');
+            } catch (err) {
+                alert("Fehler bei OpenPGP-Generierung: " + err.message);
+                document.getElementById('pgpStatus').classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
